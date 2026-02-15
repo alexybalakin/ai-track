@@ -51,6 +51,25 @@ export function useCreateBoard() {
   });
 }
 
+export function useReorderBoards() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (boardIds: string[]) => {
+      const res = await fetch("/api/boards", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ boardIds }),
+      });
+      if (!res.ok) throw new Error("Failed to reorder boards");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["boards"] });
+    },
+  });
+}
+
 export function useDeleteBoard() {
   const queryClient = useQueryClient();
 

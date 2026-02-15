@@ -1,8 +1,32 @@
 "use client";
 
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useBoard } from "@/hooks/useBoards";
 import { KanbanBoard } from "./kanban-board";
 import Link from "next/link";
+
+const HEIGHT_STORAGE_KEY = "ai-track:board-heights";
+
+function getBoardHeight(boardId: string): number {
+  if (typeof window === "undefined") return 480;
+  try {
+    const stored = localStorage.getItem(HEIGHT_STORAGE_KEY);
+    if (stored) {
+      const heights = JSON.parse(stored);
+      if (heights[boardId]) return heights[boardId];
+    }
+  } catch {}
+  return 480;
+}
+
+function setBoardHeight(boardId: string, height: number) {
+  try {
+    const stored = localStorage.getItem(HEIGHT_STORAGE_KEY);
+    const heights = stored ? JSON.parse(stored) : {};
+    heights[boardId] = height;
+    localStorage.setItem(HEIGHT_STORAGE_KEY, JSON.stringify(heights));
+  } catch {}
+}
 
 interface BoardMeta {
   id: string;
@@ -17,19 +41,39 @@ function BoardRowHeader({
   board,
   isExpanded,
   onToggle,
+  dragHandleProps,
 }: {
   board: BoardMeta;
   isExpanded: boolean;
   onToggle: () => void;
+  dragHandleProps?: Record<string, unknown>;
 }) {
   return (
     <div
       onClick={onToggle}
-      className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-slate-50/80 transition select-none"
+      className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-slate-50/80 transition select-none"
     >
+      {/* Drag handle */}
+      {dragHandleProps && (
+        <div
+          {...dragHandleProps}
+          onClick={(e) => e.stopPropagation()}
+          className="p-1 rounded hover:bg-slate-100 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition flex-shrink-0"
+        >
+          <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
+            <circle cx="3" cy="2" r="1.5" />
+            <circle cx="9" cy="2" r="1.5" />
+            <circle cx="3" cy="8" r="1.5" />
+            <circle cx="9" cy="8" r="1.5" />
+            <circle cx="3" cy="14" r="1.5" />
+            <circle cx="9" cy="14" r="1.5" />
+          </svg>
+        </div>
+      )}
+
       {/* Chevron */}
       <svg
-        className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`}
+        className={`w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`}
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -37,7 +81,7 @@ function BoardRowHeader({
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
-          strokeWidth={2}
+          strokeWidth={2.5}
           d="M9 5l7 7-7 7"
         />
       </svg>
@@ -45,11 +89,11 @@ function BoardRowHeader({
       {/* Title & description */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-slate-900 truncate">
+          <h3 className="font-semibold text-sm text-slate-900 truncate">
             {board.title}
           </h3>
           {board.description && (
-            <span className="text-sm text-slate-400 truncate hidden sm:inline">
+            <span className="text-xs text-slate-400 truncate hidden sm:inline">
               — {board.description}
             </span>
           )}
@@ -66,11 +110,11 @@ function BoardRowHeader({
       <Link
         href={`/board/${board.id}`}
         onClick={(e) => e.stopPropagation()}
-        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition flex-shrink-0"
+        className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition flex-shrink-0"
         title="Open fullscreen"
       >
         <svg
-          className="w-4 h-4"
+          className="w-3.5 h-3.5"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -90,11 +134,54 @@ function BoardRowHeader({
 // Content that loads board data lazily
 function BoardRowContent({ boardId }: { boardId: string }) {
   const { data: board, isLoading, error } = useBoard(boardId);
+  const [height, setHeight] = useState(() => getBoardHeight(boardId));
+  const isResizing = useRef(false);
+  const startY = useRef(0);
+  const startHeight = useRef(0);
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      isResizing.current = true;
+      startY.current = e.clientY;
+      startHeight.current = height;
+
+      function onMouseMove(ev: MouseEvent) {
+        if (!isResizing.current) return;
+        const delta = ev.clientY - startY.current;
+        const newHeight = Math.max(200, Math.min(1200, startHeight.current + delta));
+        setHeight(newHeight);
+      }
+
+      function onMouseUp() {
+        if (!isResizing.current) return;
+        isResizing.current = false;
+        setBoardHeight(boardId, height);
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+      }
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [boardId, height]
+  );
+
+  // Save height on change
+  useEffect(() => {
+    if (!isResizing.current) {
+      setBoardHeight(boardId, height);
+    }
+  }, [boardId, height]);
 
   if (isLoading) {
     return (
-      <div className="px-5 pb-5">
-        <div className="h-[420px] bg-slate-50 rounded-xl animate-pulse flex items-center justify-center">
+      <div className="px-4 pb-4">
+        <div
+          className="bg-slate-50 rounded-xl animate-pulse flex items-center justify-center"
+          style={{ height }}
+        >
           <div className="flex flex-col items-center gap-2">
             <div className="w-8 h-8 bg-slate-200 rounded-lg" />
             <div className="h-3 bg-slate-200 rounded w-24" />
@@ -106,7 +193,7 @@ function BoardRowContent({ boardId }: { boardId: string }) {
 
   if (error || !board) {
     return (
-      <div className="px-5 pb-5">
+      <div className="px-4 pb-4">
         <div className="h-32 bg-red-50 rounded-xl flex items-center justify-center text-sm text-red-500">
           Failed to load board
         </div>
@@ -115,9 +202,30 @@ function BoardRowContent({ boardId }: { boardId: string }) {
   }
 
   return (
-    <div className="border-t border-slate-100">
-      <div className="h-[480px] overflow-hidden">
+    <div className="border-t border-slate-100 relative">
+      <div className="overflow-hidden" style={{ height }}>
         <KanbanBoard board={board} />
+      </div>
+
+      {/* Resize handle — bottom right corner */}
+      <div
+        onMouseDown={handleMouseDown}
+        className="absolute bottom-0 right-0 w-5 h-5 cursor-ns-resize group flex items-end justify-end"
+        title="Drag to resize"
+      >
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          className="text-slate-300 group-hover:text-slate-500 transition mr-1 mb-1"
+        >
+          <path
+            d="M9 1L1 9M9 5L5 9M9 9L9 9"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
       </div>
     </div>
   );
@@ -128,10 +236,12 @@ export function BoardRow({
   board,
   isExpanded,
   onToggle,
+  dragHandleProps,
 }: {
   board: BoardMeta;
   isExpanded: boolean;
   onToggle: () => void;
+  dragHandleProps?: Record<string, unknown>;
 }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
@@ -139,6 +249,7 @@ export function BoardRow({
         board={board}
         isExpanded={isExpanded}
         onToggle={onToggle}
+        dragHandleProps={dragHandleProps}
       />
       {isExpanded && <BoardRowContent boardId={board.id} />}
     </div>

@@ -17,7 +17,7 @@ export async function GET() {
       _count: { select: { tasks: true, members: true, columns: true } },
       owner: { select: { id: true, name: true, email: true } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ order: "asc" }, { createdAt: "desc" }],
   });
 
   return NextResponse.json(boards);
@@ -53,4 +53,42 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json(board, { status: 201 });
+}
+
+export async function PUT(req: Request) {
+  const { error, session } = await requireAuth();
+  if (error) return error;
+
+  const { boardIds } = await req.json();
+
+  if (!Array.isArray(boardIds) || boardIds.length === 0) {
+    return NextResponse.json({ error: "boardIds required" }, { status: 400 });
+  }
+
+  // Verify all boards belong to the user
+  const boards = await prisma.board.findMany({
+    where: {
+      id: { in: boardIds },
+      OR: [
+        { ownerId: session!.user.id },
+        { members: { some: { userId: session!.user.id } } },
+      ],
+    },
+    select: { id: true },
+  });
+
+  if (boards.length !== boardIds.length) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  await prisma.$transaction(
+    boardIds.map((boardId: string, index: number) =>
+      prisma.board.update({
+        where: { id: boardId },
+        data: { order: index },
+      })
+    )
+  );
+
+  return NextResponse.json({ ok: true });
 }
