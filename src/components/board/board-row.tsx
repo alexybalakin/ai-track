@@ -207,13 +207,25 @@ function BoardRowContent({ boardId }: { boardId: string }) {
         <KanbanBoard board={board} />
       </div>
 
-      {/* Resize handle — bottom center */}
+      {/* Resize handle — bottom right corner */}
       <div
         onMouseDown={handleMouseDown}
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-3 cursor-ns-resize group flex items-center justify-center"
+        className="absolute bottom-0 right-0 w-5 h-5 cursor-nwse-resize group flex items-end justify-end"
         title="Drag to resize"
       >
-        <div className="w-8 h-[3px] rounded-full bg-slate-200 group-hover:bg-slate-300 transition" />
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          className="text-slate-200 group-hover:text-slate-400 transition mr-1.5 mb-1.5"
+        >
+          <path
+            d="M9 1L1 9M9 5L5 9"
+            stroke="currentColor"
+            strokeWidth="1"
+            strokeLinecap="round"
+          />
+        </svg>
       </div>
     </div>
   );

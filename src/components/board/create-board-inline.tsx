@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useCreateBoard } from "@/hooks/useBoards";
 import toast from "react-hot-toast";
 
@@ -13,6 +13,13 @@ export function CreateBoardInline({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const createBoard = useCreateBoard();
+  const formRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [isOpen]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,7 +62,7 @@ export function CreateBoardInline({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
+    <div ref={formRef} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4">
       <h3 className="font-medium text-sm text-slate-900 mb-2">New Project</h3>
       <form onSubmit={handleSubmit} className="space-y-3">
         <input

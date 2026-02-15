@@ -281,7 +281,7 @@ export function KanbanBoard({ board }: { board: Board }) {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex-1 flex items-stretch p-6 overflow-x-auto gap-0">
+        <div className="flex-1 flex items-stretch p-6 overflow-x-auto gap-0 thin-scrollbar">
           <SortableContext
             items={sortableColumnIds}
             strategy={horizontalListSortingStrategy}
