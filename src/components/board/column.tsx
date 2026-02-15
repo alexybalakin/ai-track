@@ -1,6 +1,8 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -28,6 +30,7 @@ interface ColumnProps {
   color: string;
   aiEnabled: boolean;
   tasks: Task[];
+  isDraggingColumn: boolean;
   onTaskClick: (task: Task) => void;
   onAddTask: () => void;
   onSettingsClick: () => void;
@@ -47,20 +50,62 @@ export function Column({
   color,
   aiEnabled,
   tasks,
+  isDraggingColumn,
   onTaskClick,
   onAddTask,
   onSettingsClick,
 }: ColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: `column-${id}`,
+    data: { type: "column", columnId: id },
+  });
+
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id,
+    data: { type: "column-droppable", columnId: id },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(
+      transform ? { ...transform, scaleX: 1, scaleY: 1 } : null
+    ),
+    transition,
+  };
 
   return (
     <div
+      ref={setSortableRef}
+      style={style}
       className={`flex-1 min-w-[280px] max-w-[340px] flex flex-col rounded-2xl transition ${
-        isOver ? "bg-blue-50/80" : "bg-slate-50/50"
-      }`}
+        isDragging ? "opacity-40 z-50" : ""
+      } ${isOver && !isDraggingColumn ? "bg-blue-50/80" : "bg-slate-50/50"}`}
     >
+      {/* Header with drag handle */}
       <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {/* Drag handle */}
+          <button
+            {...attributes}
+            {...listeners}
+            className="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing p-0.5 -ml-1 touch-none"
+            title="Drag to reorder"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="9" cy="5" r="1.5" />
+              <circle cx="15" cy="5" r="1.5" />
+              <circle cx="9" cy="12" r="1.5" />
+              <circle cx="15" cy="12" r="1.5" />
+              <circle cx="9" cy="19" r="1.5" />
+              <circle cx="15" cy="19" r="1.5" />
+            </svg>
+          </button>
           <span
             className="text-xs font-medium px-2.5 py-1 rounded-lg"
             style={{
@@ -128,8 +173,9 @@ export function Column({
         </div>
       </div>
 
+      {/* Task drop zone */}
       <div
-        ref={setNodeRef}
+        ref={setDroppableRef}
         className="flex-1 px-3 pb-3 space-y-2 overflow-y-auto"
       >
         <SortableContext

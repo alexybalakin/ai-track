@@ -75,3 +75,46 @@ export async function POST(
 
   return NextResponse.json(column, { status: 201 });
 }
+
+// Bulk reorder columns
+export async function PUT(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { error, session } = await requireAuth();
+  if (error) return error;
+
+  const { id } = await params;
+  const { columnIds } = await req.json();
+
+  if (!Array.isArray(columnIds) || columnIds.length === 0) {
+    return NextResponse.json({ error: "columnIds array is required" }, { status: 400 });
+  }
+
+  // Verify board access
+  const board = await prisma.board.findFirst({
+    where: {
+      id,
+      OR: [
+        { ownerId: session!.user.id },
+        { members: { some: { userId: session!.user.id } } },
+      ],
+    },
+  });
+
+  if (!board) {
+    return NextResponse.json({ error: "Board not found" }, { status: 404 });
+  }
+
+  // Update all column orders in a transaction
+  await prisma.$transaction(
+    columnIds.map((columnId: string, index: number) =>
+      prisma.boardColumn.update({
+        where: { id: columnId },
+        data: { order: index },
+      })
+    )
+  );
+
+  return NextResponse.json({ success: true });
+}

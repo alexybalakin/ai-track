@@ -1,23 +1,32 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  closestCenter,
+  pointerWithin,
   PointerSensor,
   useSensor,
   useSensors,
   DragStartEvent,
   DragEndEvent,
+  DragOverEvent,
+  CollisionDetection,
+  rectIntersection,
 } from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { Column } from "./column";
 import { TaskCard } from "./task-card";
 import { TaskModal } from "@/components/task/task-modal";
 import { CreateTaskForm } from "@/components/task/create-task-form";
 import { ColumnSettings } from "@/components/board/column-settings";
 import { useUpdateTaskStatus } from "@/hooks/useTasks";
-import { useCreateColumn } from "@/hooks/useColumns";
+import { useCreateColumn, useReorderColumns } from "@/hooks/useColumns";
 import type { BoardColumn } from "@/types";
 import toast from "react-hot-toast";
 
@@ -55,17 +64,45 @@ interface Board {
   members: { id: string; user: { id: string; name?: string; email: string } }[];
 }
 
+// Custom collision detection: for columns use closestCenter, for tasks use pointerWithin+rectIntersection
+const customCollisionDetection: CollisionDetection = (args) => {
+  const activeData = args.active.data.current;
+
+  if (activeData?.type === "column") {
+    return closestCenter(args);
+  }
+
+  // For tasks: try pointerWithin first, fallback to rectIntersection
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) return pointerCollisions;
+  return rectIntersection(args);
+};
+
 export function KanbanBoard({ board }: { board: Board }) {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createInColumnId, setCreateInColumnId] = useState<string | undefined>();
   const [settingsColumn, setSettingsColumn] = useState<BoardColumn | null>(null);
+  const [localColumns, setLocalColumns] = useState<BoardColumn[]>([]);
   const updateStatus = useUpdateTaskStatus(board.id);
   const createColumn = useCreateColumn(board.id);
+  const reorderColumns = useReorderColumns(board.id);
   const prevAiStates = useRef<Record<string, string>>({});
 
-  const columns = board.columns || [];
+  // Sync local columns with board data
+  useEffect(() => {
+    setLocalColumns(board.columns || []);
+  }, [board.columns]);
+
+  const columns = localColumns;
+
+  // Sortable column IDs (prefixed to differentiate from task IDs)
+  const sortableColumnIds = useMemo(
+    () => columns.map((c) => `column-${c.id}`),
+    [columns]
+  );
 
   // Track AI state changes and show toast notifications
   useEffect(() => {
@@ -112,29 +149,84 @@ export function KanbanBoard({ board }: { board: Board }) {
   );
 
   function handleDragStart(event: DragStartEvent) {
-    const task = board.tasks.find((t) => t.id === event.active.id);
-    if (task) setActiveTask(task);
+    const data = event.active.data.current;
+
+    if (data?.type === "column") {
+      setActiveColumnId(data.columnId);
+      setActiveTask(null);
+    } else {
+      const task = board.tasks.find((t) => t.id === event.active.id);
+      if (task) {
+        setActiveTask(task);
+        setActiveColumnId(null);
+      }
+    }
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeData = active.data.current;
+
+    // Only handle column reordering during drag-over for smooth preview
+    if (activeData?.type === "column") {
+      const overData = over.data.current;
+      if (overData?.type === "column") {
+        const activeColId = activeData.columnId;
+        const overColId = overData.columnId;
+        if (activeColId !== overColId) {
+          setLocalColumns((prev) => {
+            const oldIndex = prev.findIndex((c) => c.id === activeColId);
+            const newIndex = prev.findIndex((c) => c.id === overColId);
+            if (oldIndex === -1 || newIndex === -1) return prev;
+            return arrayMove(prev, oldIndex, newIndex);
+          });
+        }
+      }
+    }
   }
 
   async function handleDragEnd(event: DragEndEvent) {
-    setActiveTask(null);
     const { active, over } = event;
+    const activeData = active.data.current;
+
+    setActiveTask(null);
+    setActiveColumnId(null);
 
     if (!over) return;
 
+    // Handle column drop
+    if (activeData?.type === "column") {
+      // Save the new column order
+      const newColumnIds = localColumns.map((c) => c.id);
+      try {
+        await reorderColumns.mutateAsync(newColumnIds);
+      } catch {
+        // Revert on error
+        setLocalColumns(board.columns || []);
+        toast.error("Failed to reorder columns");
+      }
+      return;
+    }
+
+    // Handle task drop
     const taskId = active.id as string;
     const task = board.tasks.find((t) => t.id === taskId);
     if (!task) return;
 
     // Determine the target column ID
-    let targetColumnId: string;
-    if (columns.some((c) => c.id === over.id)) {
-      // Dropped on column directly
+    let targetColumnId: string | undefined;
+    const overData = over.data.current;
+
+    if (overData?.type === "column-droppable") {
+      targetColumnId = overData.columnId;
+    } else if (columns.some((c) => c.id === over.id)) {
       targetColumnId = over.id as string;
     } else {
       // Dropped on another task — find its column
       const overTask = board.tasks.find((t) => t.id === over.id);
-      targetColumnId = overTask?.columnId || task.columnId || "";
+      targetColumnId = overTask?.columnId || task.columnId;
     }
 
     if (!targetColumnId || targetColumnId === task.columnId) return;
@@ -175,28 +267,54 @@ export function KanbanBoard({ board }: { board: Board }) {
     }
   }
 
+  const isDraggingColumn = activeColumnId !== null;
+  const activeCol = activeColumnId
+    ? columns.find((c) => c.id === activeColumnId)
+    : null;
+
   return (
     <>
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={customCollisionDetection}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex-1 flex gap-4 p-6 overflow-x-auto">
-          {columns.map((column) => (
-            <Column
-              key={column.id}
-              id={column.id}
-              title={column.title}
-              color={column.color}
-              aiEnabled={column.aiEnabled}
-              tasks={tasksByColumn[column.id] || []}
-              onTaskClick={setSelectedTask}
-              onAddTask={() => handleAddTask(column.id)}
-              onSettingsClick={() => setSettingsColumn(column)}
-            />
-          ))}
+        <div className="flex-1 flex items-stretch p-6 overflow-x-auto gap-0">
+          <SortableContext
+            items={sortableColumnIds}
+            strategy={horizontalListSortingStrategy}
+          >
+            {columns.map((column, index) => (
+              <div key={column.id} className="flex items-stretch">
+                {/* Divider before column (except first) */}
+                {index > 0 && (
+                  <div className="flex items-stretch px-2 flex-shrink-0">
+                    <div className="w-px bg-slate-200 self-stretch my-3" />
+                  </div>
+                )}
+                <Column
+                  id={column.id}
+                  title={column.title}
+                  color={column.color}
+                  aiEnabled={column.aiEnabled}
+                  tasks={tasksByColumn[column.id] || []}
+                  isDraggingColumn={isDraggingColumn}
+                  onTaskClick={setSelectedTask}
+                  onAddTask={() => handleAddTask(column.id)}
+                  onSettingsClick={() => setSettingsColumn(column)}
+                />
+              </div>
+            ))}
+          </SortableContext>
+
+          {/* Divider before add button */}
+          {columns.length > 0 && (
+            <div className="flex items-stretch px-2 flex-shrink-0">
+              <div className="w-px bg-slate-200 self-stretch my-3" />
+            </div>
+          )}
 
           {/* Add Column button */}
           <button
@@ -221,9 +339,38 @@ export function KanbanBoard({ board }: { board: Board }) {
           </button>
         </div>
 
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeTask && (
             <TaskCard task={activeTask} isOverlay />
+          )}
+          {activeCol && (
+            <div className="min-w-[280px] max-w-[340px] bg-slate-50 rounded-2xl shadow-2xl opacity-90 border border-blue-200 p-4">
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-xs font-medium px-2.5 py-1 rounded-lg"
+                  style={{
+                    backgroundColor: `color-mix(in srgb, ${activeCol.color} 15%, white)`,
+                    color: activeCol.color,
+                  }}
+                >
+                  {activeCol.title}
+                </span>
+                {activeCol.aiEnabled && (
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${activeCol.color} 15%, white)`,
+                      color: activeCol.color,
+                    }}
+                  >
+                    AI
+                  </span>
+                )}
+                <span className="text-xs text-slate-400">
+                  {(tasksByColumn[activeCol.id] || []).length} tasks
+                </span>
+              </div>
+            </div>
           )}
         </DragOverlay>
       </DndContext>

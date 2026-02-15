@@ -53,6 +53,25 @@ export function useUpdateColumn(boardId: string) {
   });
 }
 
+export function useReorderColumns(boardId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (columnIds: string[]) => {
+      const res = await fetch(`/api/boards/${boardId}/columns`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ columnIds }),
+      });
+      if (!res.ok) throw new Error("Failed to reorder columns");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["board", boardId] });
+    },
+  });
+}
+
 export function useDeleteColumn(boardId: string) {
   const queryClient = useQueryClient();
 
