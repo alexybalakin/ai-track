@@ -24,6 +24,7 @@ export async function GET(
         include: {
           assignee: { select: { id: true, name: true, email: true } },
           _count: { select: { comments: true } },
+          aiIterations: { orderBy: { number: "asc" } },
         },
         orderBy: { order: "asc" },
       },

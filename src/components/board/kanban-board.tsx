@@ -19,6 +19,16 @@ import { useUpdateTaskStatus } from "@/hooks/useTasks";
 import { COLUMNS, type TaskStatus } from "@/types";
 import toast from "react-hot-toast";
 
+interface AiIteration {
+  id: string;
+  number: number;
+  result: string;
+  log?: string;
+  state: string;
+  feedback?: string;
+  createdAt: string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -31,6 +41,7 @@ interface Task {
   aiLog?: string;
   assignee?: { id: string; name?: string; email: string };
   _count?: { comments: number };
+  aiIterations?: AiIteration[];
 }
 
 interface Board {

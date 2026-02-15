@@ -65,9 +65,23 @@ model Task {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  board    Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  assignee User?     @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  comments Comment[]
+  board        Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  assignee     User?          @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  comments     Comment[]
+  aiIterations AiIteration[]
+}
+
+model AiIteration {
+  id        String   @id @default(cuid())
+  number    Int
+  result    String   @db.Text
+  log       String?  @db.Text
+  state     String   @default("succeeded")
+  feedback  String?  @db.Text
+  taskId    String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 }
 
 model Comment {

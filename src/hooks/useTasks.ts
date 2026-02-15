@@ -54,15 +54,17 @@ export function useUpdateTaskStatus(boardId: string) {
       id,
       status,
       order,
+      feedback,
     }: {
       id: string;
       status: string;
       order?: number;
+      feedback?: string;
     }) => {
       const res = await fetch(`/api/tasks/${id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, order }),
+        body: JSON.stringify({ status, order, feedback }),
       });
       if (!res.ok) throw new Error("Failed to update task status");
       return res.json();
