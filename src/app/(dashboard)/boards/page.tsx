@@ -121,7 +121,7 @@ export default function BoardsPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-[60px] py-6">
+      <div className="mx-[40px] py-6">
         <div className="animate-pulse space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-14 bg-slate-200 rounded-2xl" />
@@ -133,7 +133,7 @@ export default function BoardsPage() {
 
   if (localBoards.length === 0) {
     return (
-      <div className="mx-[60px] py-6">
+      <div className="mx-[40px] py-6">
         <div className="text-center py-20">
           <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <svg
@@ -165,7 +165,7 @@ export default function BoardsPage() {
   }
 
   return (
-    <div className="mx-[60px] py-6">
+    <div className="mx-[40px] py-6">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
