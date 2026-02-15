@@ -217,7 +217,7 @@ export default function BoardsPage() {
         </DragOverlay>
       </DndContext>
 
-      <div className="mt-3 max-w-xs">
+      <div className="mt-3 max-w-lg mx-auto">
         <CreateBoardInline onCreated={expand} />
       </div>
     </div>

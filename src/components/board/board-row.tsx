@@ -53,24 +53,6 @@ function BoardRowHeader({
       onClick={onToggle}
       className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-slate-50/80 transition select-none"
     >
-      {/* Drag handle */}
-      {dragHandleProps && (
-        <div
-          {...dragHandleProps}
-          onClick={(e) => e.stopPropagation()}
-          className="p-1 rounded hover:bg-slate-100 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition flex-shrink-0"
-        >
-          <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
-            <circle cx="3" cy="2" r="1.5" />
-            <circle cx="9" cy="2" r="1.5" />
-            <circle cx="3" cy="8" r="1.5" />
-            <circle cx="9" cy="8" r="1.5" />
-            <circle cx="3" cy="14" r="1.5" />
-            <circle cx="9" cy="14" r="1.5" />
-          </svg>
-        </div>
-      )}
-
       {/* Chevron */}
       <svg
         className={`w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? "rotate-90" : ""}`}
@@ -127,6 +109,24 @@ function BoardRowHeader({
           />
         </svg>
       </Link>
+
+      {/* Drag handle — right side */}
+      {dragHandleProps && (
+        <div
+          {...dragHandleProps}
+          onClick={(e) => e.stopPropagation()}
+          className="p-1 rounded hover:bg-slate-100 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 transition flex-shrink-0"
+        >
+          <svg width="12" height="16" viewBox="0 0 12 16" fill="currentColor">
+            <circle cx="3" cy="2" r="1.5" />
+            <circle cx="9" cy="2" r="1.5" />
+            <circle cx="3" cy="8" r="1.5" />
+            <circle cx="9" cy="8" r="1.5" />
+            <circle cx="3" cy="14" r="1.5" />
+            <circle cx="9" cy="14" r="1.5" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 }
@@ -207,25 +207,13 @@ function BoardRowContent({ boardId }: { boardId: string }) {
         <KanbanBoard board={board} />
       </div>
 
-      {/* Resize handle — bottom right corner */}
+      {/* Resize handle — bottom center */}
       <div
         onMouseDown={handleMouseDown}
-        className="absolute bottom-0 right-0 w-5 h-5 cursor-ns-resize group flex items-end justify-end"
+        className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-3 cursor-ns-resize group flex items-center justify-center"
         title="Drag to resize"
       >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          className="text-slate-300 group-hover:text-slate-500 transition mr-1 mb-1"
-        >
-          <path
-            d="M9 1L1 9M9 5L5 9M9 9L9 9"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        <div className="w-8 h-[3px] rounded-full bg-slate-200 group-hover:bg-slate-300 transition" />
       </div>
     </div>
   );
