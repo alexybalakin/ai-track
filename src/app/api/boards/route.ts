@@ -14,7 +14,7 @@ export async function GET() {
       ],
     },
     include: {
-      _count: { select: { tasks: true, members: true } },
+      _count: { select: { tasks: true, members: true, columns: true } },
       owner: { select: { id: true, name: true, email: true } },
     },
     orderBy: { createdAt: "desc" },
