@@ -1,0 +1,48 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireAuth } from "@/lib/session";
+
+export async function GET() {
+  const { error, session } = await requireAuth();
+  if (error) return error;
+
+  const boards = await prisma.board.findMany({
+    where: {
+      OR: [
+        { ownerId: session!.user.id },
+        { members: { some: { userId: session!.user.id } } },
+      ],
+    },
+    include: {
+      _count: { select: { tasks: true, members: true } },
+      owner: { select: { id: true, name: true, email: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return NextResponse.json(boards);
+}
+
+export async function POST(req: Request) {
+  const { error, session } = await requireAuth();
+  if (error) return error;
+
+  const { title, description } = await req.json();
+
+  if (!title?.trim()) {
+    return NextResponse.json({ error: "Title is required" }, { status: 400 });
+  }
+
+  const board = await prisma.board.create({
+    data: {
+      title: title.trim(),
+      description: description?.trim() || null,
+      ownerId: session!.user.id,
+      members: {
+        create: { userId: session!.user.id, role: "owner" },
+      },
+    },
+  });
+
+  return NextResponse.json(board, { status: 201 });
+}
