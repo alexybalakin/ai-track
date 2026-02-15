@@ -6,6 +6,7 @@ import { useUpdateTask, useDeleteTask, useUpdateTaskStatus, useComments } from "
 import { formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
 import ReactMarkdown from "react-markdown";
+import type { BoardColumn } from "@/types";
 
 interface AiIteration {
   id: string;
@@ -26,6 +27,7 @@ interface Task {
   aiState: string;
   aiResult?: string;
   aiLog?: string;
+  columnId?: string;
   assignee?: { id: string; name?: string; email: string };
   createdAt?: string;
   updatedAt?: string;
@@ -38,13 +40,6 @@ interface Comment {
   createdAt: string;
   author: { id: string; name?: string; email: string; avatarUrl?: string };
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  todo: "To Do",
-  in_progress_ai: "In Progress (AI)",
-  review: "Review",
-  done: "Done",
-};
 
 const AI_STATE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   idle: { bg: "bg-slate-100", text: "text-slate-600", label: "Idle" },
@@ -59,10 +54,12 @@ const MARKDOWN_CLASSES =
 export function TaskModal({
   task,
   boardId,
+  columns = [],
   onClose,
 }: {
   task: Task;
   boardId: string;
+  columns?: BoardColumn[];
   onClose: () => void;
 }) {
   const [commentText, setCommentText] = useState("");
@@ -118,16 +115,23 @@ export function TaskModal({
     }
   }
 
+  // Find an AI-enabled column to return task to
+  const aiColumn = columns.find((c) => c.aiEnabled);
+
   async function handleReturnToAI() {
     if (!feedbackText.trim()) {
       toast.error("Please enter feedback for AI");
+      return;
+    }
+    if (!aiColumn) {
+      toast.error("No AI-enabled column found");
       return;
     }
 
     try {
       await updateStatus.mutateAsync({
         id: task.id,
-        status: "in_progress_ai",
+        columnId: aiColumn.id,
         feedback: feedbackText.trim(),
       });
       setFeedbackText("");
@@ -173,7 +177,7 @@ export function TaskModal({
         <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-3">
             <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600">
-              {STATUS_LABELS[task.status] || task.status}
+              {task.status}
             </span>
             <span
               className={`text-xs font-medium px-2.5 py-1 rounded-lg ${aiStyle.bg} ${aiStyle.text}`}
@@ -427,8 +431,8 @@ export function TaskModal({
             </div>
           )}
 
-          {/* Feedback & Return to AI — shown when task is in review */}
-          {task.status === "review" && task.aiState === "succeeded" && (
+          {/* Feedback & Return to AI — shown when task has succeeded AI and there's an AI column */}
+          {task.aiState === "succeeded" && aiColumn && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
               <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -3,15 +3,14 @@
 import { useState } from "react";
 import { useCreateTask } from "@/hooks/useTasks";
 import toast from "react-hot-toast";
-import type { TaskStatus } from "@/types";
 
 export function CreateTaskForm({
   boardId,
-  defaultStatus,
+  defaultColumnId,
   onClose,
 }: {
   boardId: string;
-  defaultStatus: TaskStatus;
+  defaultColumnId?: string;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState("");
@@ -29,6 +28,7 @@ export function CreateTaskForm({
         description,
         boardId,
         priority,
+        columnId: defaultColumnId,
       });
       toast.success("Task created");
       onClose();

@@ -12,6 +12,7 @@ export function useCreateTask() {
       boardId: string;
       priority?: string;
       assigneeId?: string;
+      columnId?: string;
     }) => {
       const res = await fetch("/api/tasks", {
         method: "POST",
@@ -52,19 +53,19 @@ export function useUpdateTaskStatus(boardId: string) {
   return useMutation({
     mutationFn: async ({
       id,
-      status,
+      columnId,
       order,
       feedback,
     }: {
       id: string;
-      status: string;
+      columnId: string;
       order?: number;
       feedback?: string;
     }) => {
       const res = await fetch(`/api/tasks/${id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, order, feedback }),
+        body: JSON.stringify({ columnId, order, feedback }),
       });
       if (!res.ok) throw new Error("Failed to update task status");
       return res.json();

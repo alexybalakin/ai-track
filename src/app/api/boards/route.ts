@@ -41,6 +41,14 @@ export async function POST(req: Request) {
       members: {
         create: { userId: session!.user.id, role: "owner" },
       },
+      columns: {
+        create: [
+          { title: "To Do",            color: "#64748b", order: 0, aiEnabled: false },
+          { title: "In Progress (AI)", color: "#3b82f6", order: 1, aiEnabled: true  },
+          { title: "Review",           color: "#f59e0b", order: 2, aiEnabled: false },
+          { title: "Done",             color: "#22c55e", order: 3, aiEnabled: false },
+        ],
+      },
     },
   });
 

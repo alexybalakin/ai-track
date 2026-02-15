@@ -6,7 +6,7 @@ export async function POST(req: Request) {
   const { error, session } = await requireAuth();
   if (error) return error;
 
-  const { title, description, boardId, priority, assigneeId } = await req.json();
+  const { title, description, boardId, priority, assigneeId, columnId } = await req.json();
 
   if (!title?.trim() || !boardId) {
     return NextResponse.json(
@@ -29,8 +29,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Board not found" }, { status: 404 });
   }
 
+  // If no columnId provided, find the first column of the board
+  let targetColumnId = columnId;
+  if (!targetColumnId) {
+    const firstColumn = await prisma.boardColumn.findFirst({
+      where: { boardId },
+      orderBy: { order: "asc" },
+    });
+    targetColumnId = firstColumn?.id;
+  }
+
   const maxOrder = await prisma.task.aggregate({
-    where: { boardId, status: "todo" },
+    where: { boardId, columnId: targetColumnId || undefined },
     _max: { order: true },
   });
 
@@ -39,6 +49,7 @@ export async function POST(req: Request) {
       title: title.trim(),
       description: description?.trim() || null,
       boardId,
+      columnId: targetColumnId || null,
       priority: priority || "medium",
       assigneeId: assigneeId || null,
       order: (maxOrder._max.order ?? -1) + 1,

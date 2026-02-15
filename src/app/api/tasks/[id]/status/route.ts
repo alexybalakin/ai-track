@@ -3,8 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/session";
 import OpenAI from "openai";
 
-const VALID_STATUSES = ["todo", "in_progress_ai", "review", "done"];
-
 function getGroqClient() {
   return new OpenAI({
     apiKey: process.env.GROQ_API_KEY || "",
@@ -20,10 +18,19 @@ export async function PUT(
   if (error) return error;
 
   const { id } = await params;
-  const { status, order, feedback } = await req.json();
+  const { columnId, order, feedback } = await req.json();
 
-  if (!VALID_STATUSES.includes(status)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  if (!columnId) {
+    return NextResponse.json({ error: "columnId is required" }, { status: 400 });
+  }
+
+  // Verify target column exists
+  const targetColumn = await prisma.boardColumn.findUnique({
+    where: { id: columnId },
+  });
+
+  if (!targetColumn) {
+    return NextResponse.json({ error: "Column not found" }, { status: 400 });
   }
 
   const task = await prisma.task.findFirst({
@@ -37,6 +44,7 @@ export async function PUT(
       },
     },
     include: {
+      column: true,
       aiIterations: { orderBy: { number: "desc" }, take: 1 },
     },
   });
@@ -45,13 +53,17 @@ export async function PUT(
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
   }
 
+  const wasInAiColumn = task.column?.aiEnabled ?? false;
+  const movingToAiColumn = targetColumn.aiEnabled;
+
   const updateData: Record<string, unknown> = {
-    status,
+    columnId,
+    status: targetColumn.title, // keep status in sync for display
     order: order ?? task.order,
   };
 
-  // When moving to in_progress_ai, trigger AI
-  if (status === "in_progress_ai" && task.status !== "in_progress_ai") {
+  // When moving to an AI-enabled column, trigger AI
+  if (movingToAiColumn && !wasInAiColumn) {
     updateData.aiState = "running";
 
     // If there's feedback (returning from review), save it on the last iteration
@@ -63,8 +75,9 @@ export async function PUT(
     }
   }
 
-  // When moving back to todo, reset AI state
-  if (status === "todo") {
+  // When moving away from AI column to a non-AI column that isn't "downstream"
+  // Reset AI state only if task had failed
+  if (!movingToAiColumn && task.aiState === "failed") {
     updateData.aiState = "idle";
   }
 
@@ -74,11 +87,12 @@ export async function PUT(
     include: {
       assignee: { select: { id: true, name: true, email: true } },
       _count: { select: { comments: true } },
+      aiIterations: { orderBy: { number: "asc" } },
     },
   });
 
-  // Run AI processing when moved to in_progress_ai
-  if (status === "in_progress_ai" && task.status !== "in_progress_ai") {
+  // Run AI processing when moved to an AI-enabled column
+  if (movingToAiColumn && !wasInAiColumn) {
     processWithAI(id, task.title, task.description || "", feedback || null);
   }
 
@@ -103,6 +117,27 @@ async function processWithAI(
   });
 
   const iterationNumber = previousIterations.length + 1;
+
+  // Get the task to find the board's review-like column (first non-AI column after AI column)
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: {
+      board: {
+        include: {
+          columns: { orderBy: { order: "asc" } },
+        },
+      },
+      column: true,
+    },
+  });
+
+  // Find the next non-AI column for success, and a "todo-like" column for failure
+  const columns = task?.board.columns || [];
+  const currentColOrder = task?.column?.order ?? 0;
+  const reviewColumn = columns.find(
+    (c) => !c.aiEnabled && c.order > currentColOrder
+  );
+  const todoColumn = columns.find((c) => !c.aiEnabled && c.order === 0) || columns[0];
 
   try {
     log(`AI iteration #${iterationNumber} started`);
@@ -180,7 +215,8 @@ async function processWithAI(
         aiState: "succeeded",
         aiResult: result,
         aiLog: logs.join("\n"),
-        status: "review",
+        columnId: reviewColumn?.id,
+        status: reviewColumn?.title || "Review",
       },
     });
   } catch (err) {
@@ -204,7 +240,8 @@ async function processWithAI(
         aiState: "failed",
         aiResult: `AI error: ${errorMsg}`,
         aiLog: logs.join("\n"),
-        status: "todo",
+        columnId: todoColumn?.id,
+        status: todoColumn?.title || "To Do",
       },
     });
   }

@@ -17,6 +17,7 @@ interface Task {
   aiState: string;
   aiResult?: string;
   aiLog?: string;
+  columnId?: string;
   assignee?: { id: string; name?: string; email: string };
   _count?: { comments: number };
 }
@@ -24,19 +25,32 @@ interface Task {
 interface ColumnProps {
   id: string;
   title: string;
+  color: string;
+  aiEnabled: boolean;
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onAddTask: () => void;
+  onSettingsClick: () => void;
 }
 
-const COLUMN_COLORS: Record<string, string> = {
-  todo: "bg-slate-100 text-slate-600",
-  in_progress_ai: "bg-blue-100 text-blue-600",
-  review: "bg-amber-100 text-amber-600",
-  done: "bg-green-100 text-green-600",
-};
+function hexToTailwindBg(hex: string): string {
+  return `color-mix(in srgb, ${hex} 15%, white)`;
+}
 
-export function Column({ id, title, tasks, onTaskClick, onAddTask }: ColumnProps) {
+function hexToTailwindText(hex: string): string {
+  return hex;
+}
+
+export function Column({
+  id,
+  title,
+  color,
+  aiEnabled,
+  tasks,
+  onTaskClick,
+  onAddTask,
+  onSettingsClick,
+}: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -48,23 +62,38 @@ export function Column({ id, title, tasks, onTaskClick, onAddTask }: ColumnProps
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
           <span
-            className={`text-xs font-medium px-2.5 py-1 rounded-lg ${
-              COLUMN_COLORS[id] || "bg-slate-100 text-slate-600"
-            }`}
+            className="text-xs font-medium px-2.5 py-1 rounded-lg"
+            style={{
+              backgroundColor: hexToTailwindBg(color),
+              color: hexToTailwindText(color),
+            }}
           >
             {title}
           </span>
+          {aiEnabled && (
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+              style={{
+                backgroundColor: hexToTailwindBg(color),
+                color: hexToTailwindText(color),
+              }}
+              title="AI processes tasks in this column"
+            >
+              AI
+            </span>
+          )}
           <span className="text-xs text-slate-400 font-medium">
             {tasks.length}
           </span>
         </div>
-        {id === "todo" && (
+        <div className="flex items-center gap-1">
           <button
             onClick={onAddTask}
-            className="text-slate-400 hover:text-blue-600 transition"
+            className="text-slate-400 hover:text-blue-600 transition p-0.5"
+            title="Add task"
           >
             <svg
-              className="w-5 h-5"
+              className="w-4.5 h-4.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -77,7 +106,26 @@ export function Column({ id, title, tasks, onTaskClick, onAddTask }: ColumnProps
               />
             </svg>
           </button>
-        )}
+          <button
+            onClick={onSettingsClick}
+            className="text-slate-400 hover:text-slate-600 transition p-0.5"
+            title="Column settings"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div

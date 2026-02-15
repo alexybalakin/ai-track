@@ -33,6 +33,19 @@ model Board {
   owner   User          @relation("BoardOwner", fields: [ownerId], references: [id])
   members BoardMember[]
   tasks   Task[]
+  columns BoardColumn[]
+}
+
+model BoardColumn {
+  id        String  @id @default(cuid())
+  title     String
+  color     String  @default("#3b82f6")
+  order     Int     @default(0)
+  aiEnabled Boolean @default(false)
+  boardId   String
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
 }
 
 model BoardMember {
@@ -56,6 +69,7 @@ model Task {
   order       Int      @default(0)
 
   boardId    String
+  columnId   String?
   assigneeId String?
 
   aiState  String  @default("idle")
@@ -66,6 +80,7 @@ model Task {
   updatedAt DateTime @updatedAt
 
   board        Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column       BoardColumn?   @relation(fields: [columnId], references: [id])
   assignee     User?          @relation("TaskAssignee", fields: [assigneeId], references: [id])
   comments     Comment[]
   aiIterations AiIteration[]
