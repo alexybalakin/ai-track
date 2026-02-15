@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useUpdateTask, useDeleteTask, useComments } from "@/hooks/useTasks";
 import { formatDate } from "@/lib/utils";
 import toast from "react-hot-toast";
+import ReactMarkdown from "react-markdown";
 
 interface Task {
   id: string;
@@ -201,7 +202,11 @@ export function TaskModal({
                       : "bg-red-50 text-red-800"
                   }`}
                 >
-                  {task.aiResult || "No result available"}
+                  <div className="prose prose-sm prose-green max-w-none [&_h1]:text-base [&_h1]:font-bold [&_h1]:mb-2 [&_h1]:mt-3 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-3 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mb-1 [&_h3]:mt-2 [&_p]:mb-2 [&_p]:leading-relaxed [&_ul]:mb-2 [&_ul]:pl-4 [&_ul]:list-disc [&_ol]:mb-2 [&_ol]:pl-4 [&_ol]:list-decimal [&_li]:mb-1 [&_code]:bg-green-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono [&_pre]:bg-green-100/50 [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:mb-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_blockquote]:border-l-2 [&_blockquote]:border-green-300 [&_blockquote]:pl-3 [&_blockquote]:italic [&_strong]:font-semibold [&_hr]:my-3 [&_hr]:border-green-200">
+                    <ReactMarkdown>
+                      {task.aiResult || "No result available"}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               )}
 

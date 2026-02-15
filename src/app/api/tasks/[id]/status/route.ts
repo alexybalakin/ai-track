@@ -5,10 +5,12 @@ import OpenAI from "openai";
 
 const VALID_STATUSES = ["todo", "in_progress_ai", "review", "done"];
 
-const groq = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
-});
+function getGroqClient() {
+  return new OpenAI({
+    apiKey: process.env.GROQ_API_KEY || "",
+    baseURL: "https://api.groq.com/openai/v1",
+  });
+}
 
 export async function PUT(
   req: Request,
@@ -87,6 +89,7 @@ async function processWithAI(taskId: string, title: string, description: string)
     log(`Task: "${title}"`);
     log("Sending request to Groq...");
 
+    const groq = getGroqClient();
     const completion = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [
